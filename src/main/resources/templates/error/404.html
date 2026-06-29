@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head('404 Not Found - Task Manager')}"></head>
+<body>
+<nav th:replace="~{layout :: navbar}"></nav>
+
+<main class="container">
+    <div class="error-page">
+        <h1>404</h1>
+        <p th:text="${message != null ? message : 'The requested page was not found.'}">Page not found.</p>
+        <a th:href="@{/tasks}" class="btn btn-primary">Back to Task List</a>
+    </div>
+</main>
+
+<footer th:replace="~{layout :: footer}"></footer>
+</body>
+</html>

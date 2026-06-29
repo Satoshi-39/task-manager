@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<!-- Header Fragment -->
+<head th:fragment="head(title)">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:text="${title}">Task Manager</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+</head>
+
+<!-- Navbar Fragment -->
+<nav th:fragment="navbar" class="navbar">
+    <div class="container">
+        <a class="navbar-brand" th:href="@{/}">Task Manager</a>
+        <ul class="navbar-nav">
+            <li><a th:href="@{/}">Dashboard</a></li>
+            <li><a th:href="@{/tasks}">Tasks</a></li>
+            <li><a th:href="@{/tasks/new}">New Task</a></li>
+        </ul>
+    </div>
+</nav>
+
+<!-- Flash Messages Fragment -->
+<div th:fragment="flash" class="container">
+    <div th:if="${successMessage}" class="flash-message flash-success" th:text="${successMessage}"></div>
+    <div th:if="${errorMessage}" class="flash-message flash-error" th:text="${errorMessage}"></div>
+</div>
+
+<!-- Footer Fragment -->
+<footer th:fragment="footer" class="footer">
+    <div class="container">
+        <p>Task Manager - Java Gold Learning Project</p>
+    </div>
+</footer>
+
+</html>

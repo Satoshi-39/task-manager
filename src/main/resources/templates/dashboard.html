@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head('Dashboard - Task Manager')}"></head>
+<body>
+<nav th:replace="~{layout :: navbar}"></nav>
+<div th:replace="~{layout :: flash}"></div>
+
+<main class="container">
+    <div class="page-header">
+        <h1>Dashboard</h1>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="card-grid">
+        <div class="card">
+            <div class="card-label">Total Tasks</div>
+            <div class="card-value" th:text="${dashboard.totalTasks}">0</div>
+        </div>
+        <div class="card">
+            <div class="card-label">Completion Rate</div>
+            <div class="card-value done" th:text="${dashboard.completionRate} + '%'">0%</div>
+        </div>
+        <div class="card">
+            <div class="card-label">Overdue</div>
+            <div class="card-value overdue" th:text="${dashboard.overdueTasks}">0</div>
+        </div>
+        <div class="card">
+            <div class="card-label">Processing Time</div>
+            <div class="card-value" th:text="${dashboard.processingTimeMs} + ' ms'">0 ms</div>
+        </div>
+    </div>
+
+    <!-- Status Counts -->
+    <h2 style="margin-bottom: 1rem; font-size: 1.25rem;">Status</h2>
+    <div class="card-grid" style="margin-bottom: 2rem;">
+        <div class="card" th:each="entry : ${dashboard.statusCounts}">
+            <div class="card-label" th:text="${entry.key}">Status</div>
+            <div class="card-value" th:text="${entry.value}">0</div>
+        </div>
+    </div>
+
+    <!-- Priority Counts -->
+    <h2 style="margin-bottom: 1rem; font-size: 1.25rem;">Priority</h2>
+    <div class="card-grid">
+        <div class="card" th:each="entry : ${dashboard.priorityCounts}">
+            <div class="card-label" th:text="${entry.key}">Priority</div>
+            <div class="card-value" th:text="${entry.value}">0</div>
+        </div>
+    </div>
+</main>
+
+<footer th:replace="~{layout :: footer}"></footer>
+</body>
+</html>

@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head('Task Detail - Task Manager')}"></head>
+<body>
+<nav th:replace="~{layout :: navbar}"></nav>
+<div th:replace="~{layout :: flash}"></div>
+
+<main class="container">
+    <div class="page-header">
+        <h1>Task Detail</h1>
+        <a th:href="@{/tasks}" class="btn btn-outline">Back to List</a>
+    </div>
+
+    <div class="detail-card">
+        <div class="detail-grid">
+            <div class="detail-label">Task Number</div>
+            <div class="detail-value" th:text="${task.taskNumber}">TASK-001</div>
+
+            <div class="detail-label">Title</div>
+            <div class="detail-value" th:text="${task.title}">Title</div>
+
+            <div class="detail-label">Description</div>
+            <div class="detail-value" th:text="${task.description != null ? task.description : '-'}">-</div>
+
+            <div class="detail-label">Status</div>
+            <div class="detail-value">
+                <span class="badge"
+                      th:classappend="${task.status.name() == 'TODO'} ? 'badge-todo' :
+                                      (${task.status.name() == 'IN_PROGRESS'} ? 'badge-in-progress' :
+                                      (${task.status.name() == 'DONE'} ? 'badge-done' : 'badge-cancelled'))"
+                      th:text="${task.status.displayName}">Status</span>
+            </div>
+
+            <div class="detail-label">Priority</div>
+            <div class="detail-value">
+                <span class="badge"
+                      th:classappend="${task.priority.name() == 'LOW'} ? 'badge-low' :
+                                      (${task.priority.name() == 'MEDIUM'} ? 'badge-medium' :
+                                      (${task.priority.name() == 'HIGH'} ? 'badge-high' : 'badge-critical'))"
+                      th:text="${task.priority.displayName}">Priority</span>
+            </div>
+
+            <div class="detail-label">Due Date</div>
+            <div class="detail-value"
+                 th:text="${task.dueDate != null} ? ${#temporals.format(task.dueDate, 'yyyy/MM/dd HH:mm')} : '-'">-</div>
+
+            <div class="detail-label">Created At</div>
+            <div class="detail-value" th:text="${#temporals.format(task.createdAt, 'yyyy/MM/dd HH:mm')}">-</div>
+
+            <div class="detail-label">Updated At</div>
+            <div class="detail-value" th:text="${#temporals.format(task.updatedAt, 'yyyy/MM/dd HH:mm')}">-</div>
+
+            <div class="detail-label">Version</div>
+            <div class="detail-value" th:text="${task.version}">0</div>
+        </div>
+
+        <div class="detail-actions">
+            <a th:href="@{/tasks/{id}/edit(id=${task.id})}" class="btn btn-primary">Edit</a>
+            <form th:action="@{/tasks/{id}/delete(id=${task.id})}" method="post" style="display:inline;"
+                  onsubmit="return confirm('Are you sure you want to delete this task?');">
+                <button type="submit" class="btn btn-danger">Delete</button>
+            </form>
+        </div>
+    </div>
+</main>
+
+<footer th:replace="~{layout :: footer}"></footer>
+</body>
+</html>

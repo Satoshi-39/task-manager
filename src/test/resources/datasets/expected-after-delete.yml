@@ -1,0 +1,11 @@
+tasks:
+  - id: 2
+    task_number: "TASK-20260101-0002"
+    title: "テスト用タスク2"
+    status: "IN_PROGRESS"
+    priority: "MEDIUM"
+  - id: 3
+    task_number: "TASK-20260101-0003"
+    title: "完了済みタスク"
+    status: "DONE"
+    priority: "LOW"

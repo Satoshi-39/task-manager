@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head('Edit Task - Task Manager')}"></head>
+<body>
+<nav th:replace="~{layout :: navbar}"></nav>
+<div th:replace="~{layout :: flash}"></div>
+
+<main class="container">
+    <div class="page-header">
+        <h1>Edit Task</h1>
+        <a th:href="@{/tasks/{id}(id=${taskId})}" class="btn btn-outline">Back to Detail</a>
+    </div>
+
+    <div class="detail-card">
+        <form th:action="@{/tasks/{id}/edit(id=${taskId})}" th:object="${taskUpdateRequest}" method="post">
+            <input type="hidden" th:field="*{version}">
+
+            <div class="form-group">
+                <label for="title">Title <span style="color:#dc2626;">*</span></label>
+                <input type="text" id="title" class="form-control"
+                       th:field="*{title}"
+                       th:classappend="${#fields.hasErrors('title')} ? 'is-invalid' : ''">
+                <div class="field-error" th:if="${#fields.hasErrors('title')}" th:errors="*{title}">Error</div>
+            </div>
+
+            <div class="form-group">
+                <label for="description">Description</label>
+                <textarea id="description" class="form-control"
+                          th:field="*{description}"
+                          th:classappend="${#fields.hasErrors('description')} ? 'is-invalid' : ''"></textarea>
+                <div class="field-error" th:if="${#fields.hasErrors('description')}" th:errors="*{description}">Error</div>
+            </div>
+
+            <div class="form-group">
+                <label for="status">Status <span style="color:#dc2626;">*</span></label>
+                <select id="status" class="form-control" th:field="*{status}"
+                        th:classappend="${#fields.hasErrors('status')} ? 'is-invalid' : ''">
+                    <option th:each="s : ${T(com.example.taskmanager.domain.enums.TaskStatus).values()}"
+                            th:value="${s}" th:text="${s.displayName}"
+                            th:disabled="${!currentStatus.canTransitionTo(s) && currentStatus != s}">
+                    </option>
+                </select>
+                <div class="field-error" th:if="${#fields.hasErrors('status')}" th:errors="*{status}">Error</div>
+            </div>
+
+            <div class="form-group">
+                <label for="priority">Priority</label>
+                <select id="priority" class="form-control" th:field="*{priority}">
+                    <option value="">-- Select --</option>
+                    <option th:each="p : ${T(com.example.taskmanager.domain.enums.TaskPriority).values()}"
+                            th:value="${p}" th:text="${p.displayName}">
+                    </option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="dueDate">Due Date</label>
+                <input type="datetime-local" id="dueDate" class="form-control"
+                       th:field="*{dueDate}"
+                       th:classappend="${#fields.hasErrors('dueDate')} ? 'is-invalid' : ''">
+                <div class="field-error" th:if="${#fields.hasErrors('dueDate')}" th:errors="*{dueDate}">Error</div>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Update Task</button>
+                <a th:href="@{/tasks/{id}(id=${taskId})}" class="btn btn-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+</main>
+
+<footer th:replace="~{layout :: footer}"></footer>
+</body>
+</html>

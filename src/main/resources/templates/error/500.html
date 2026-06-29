@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head('500 Server Error - Task Manager')}"></head>
+<body>
+<nav th:replace="~{layout :: navbar}"></nav>
+
+<main class="container">
+    <div class="error-page">
+        <h1>500</h1>
+        <p>An unexpected error occurred. Please try again later.</p>
+        <a th:href="@{/}" class="btn btn-primary">Back to Dashboard</a>
+    </div>
+</main>
+
+<footer th:replace="~{layout :: footer}"></footer>
+</body>
+</html>
