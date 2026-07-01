@@ -1,5 +1,7 @@
 package com.example.taskmanager.service;
 
+import com.example.taskmanager.common.TaskEvent;
+import com.example.taskmanager.common.TaskEventPublisher;
 import com.example.taskmanager.common.TaskFilterBuilder;
 import com.example.taskmanager.common.TaskNumberGenerator;
 import com.example.taskmanager.domain.entity.Task;
@@ -11,8 +13,10 @@ import com.example.taskmanager.dto.request.TaskUpdateRequest;
 import com.example.taskmanager.exception.InvalidStatusTransitionException;
 import com.example.taskmanager.exception.TaskNotFoundException;
 import com.example.taskmanager.repository.TaskRepository;
+import com.example.taskmanager.security.SecurityUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,10 +29,15 @@ import java.util.stream.Collectors;
  * タスクのコアビジネスロジック。
  *
  * Java Gold トピック:
- * - Stream API（groupingBy, partitioningBy, toMap, reduce）
- * - Optional（map, flatMap, orElseThrow チェーン）
- * - Collections高度利用（EnumMap, Comparator合成）
- * - 関数型インタフェース（Predicate<Task> の動的組み立て）
+ * <ul>
+ *   <li>Stream API（groupingBy, partitioningBy, toMap, reduce）</li>
+ *   <li>Optional（map, flatMap, orElseThrow チェーン）</li>
+ *   <li>Collections高度利用（EnumMap, Comparator合成）</li>
+ *   <li>関数型インタフェース（Predicate&lt;Task&gt; の動的組み立て）</li>
+ *   <li>TaskCacheService（ConcurrentHashMap）によるキャッシュ</li>
+ *   <li>TaskEventPublisher（CopyOnWriteArrayList）によるイベント駆動</li>
+ *   <li>SecurityUtils によるユーザースコープ制御</li>
+ * </ul>
  */
 @Service
 @Transactional(readOnly = true)
@@ -39,17 +48,23 @@ public class TaskService {
     private final TaskRepository taskRepository;
     private final TaskNumberGenerator taskNumberGenerator;
     private final TaskNotificationService notificationService;
+    private final TaskCacheService cacheService;
+    private final TaskEventPublisher eventPublisher;
 
     public TaskService(TaskRepository taskRepository,
                        TaskNumberGenerator taskNumberGenerator,
-                       TaskNotificationService notificationService) {
+                       TaskNotificationService notificationService,
+                       TaskCacheService cacheService,
+                       TaskEventPublisher eventPublisher) {
         this.taskRepository = taskRepository;
         this.taskNumberGenerator = taskNumberGenerator;
         this.notificationService = notificationService;
+        this.cacheService = cacheService;
+        this.eventPublisher = eventPublisher;
     }
 
     /**
-     * タスク作成。
+     * タスク作成。ログインユーザーの ID を assignedUserId にセットする。
      */
     @Transactional
     public Task createTask(TaskCreateRequest request) {
@@ -64,22 +79,31 @@ public class TaskService {
                 request.getDueDate()
         );
 
+        // ログインユーザーの ID をセット
+        SecurityUtils.getCurrentUserId().ifPresent(task::setAssignedUserId);
+
         Task saved = taskRepository.save(task);
         log.info("Task created: {} ({})", saved.getTitle(), saved.getTaskNumber());
 
-        // 非同期通知
-        notificationService.notifyTaskCreated(saved);
+        // キャッシュに格納
+        cacheService.put(saved.getId(), saved);
+
+        // イベント発行（登録済みリスナーに通知）
+        eventPublisher.publish(new TaskEvent(TaskEvent.EventType.CREATED, saved));
 
         return saved;
     }
 
     /**
      * タスク更新（楽観的ロックを version フィールドで実現）。
+     * ADMIN は全タスク、USER は自分のタスクのみ更新可。
      */
     @Transactional
     public Task updateTask(Long id, TaskUpdateRequest request) {
         Task task = taskRepository.findById(id)
                 .orElseThrow(() -> new TaskNotFoundException(id));
+
+        checkOwnership(task);
 
         // ステータス遷移の検証（ステータスが変更される場合のみ）
         if (task.getStatus() != request.getStatus()
@@ -96,7 +120,13 @@ public class TaskService {
         Task updated = taskRepository.save(task);
         log.info("Task updated: {} -> {}", id, request.getStatus());
 
-        // ステータスが完了に変わった場合の通知
+        // キャッシュを更新
+        cacheService.put(updated.getId(), updated);
+
+        // イベント発行（登録済みリスナーに通知）
+        eventPublisher.publish(new TaskEvent(TaskEvent.EventType.UPDATED, updated));
+
+        // ステータスが完了に変わった場合の通知（既存の直接呼び出しは維持）
         if (request.getStatus() == TaskStatus.DONE) {
             notificationService.notifyTaskCompleted(updated);
         }
@@ -106,41 +136,65 @@ public class TaskService {
 
     /**
      * タスク削除。
+     * ADMIN は全タスク、USER は自分のタスクのみ削除可。
      */
     @Transactional
     public void deleteTask(Long id) {
         Task task = taskRepository.findById(id)
                 .orElseThrow(() -> new TaskNotFoundException(id));
+
+        checkOwnership(task);
+
         taskRepository.delete(task);
         log.info("Task deleted: {}", id);
+
+        // キャッシュから除去
+        cacheService.evict(id);
+
+        // イベント発行（登録済みリスナーに通知）
+        eventPublisher.publish(new TaskEvent(TaskEvent.EventType.DELETED, task));
     }
 
     /**
      * ID でタスクを取得。
+     * まずキャッシュを確認し、なければ DB から取得する。
+     * ADMIN は全タスク、USER は自分のタスクのみ取得可。
      * Optional の map → orElseThrow チェーンで学習。
      */
     public Task getTask(Long id) {
-        return taskRepository.findById(id)
-                .map(task -> {
-                    log.debug("Task found: {} ({})", task.getTitle(), task.getTaskNumber());
-                    return task;
+        // ConcurrentHashMap の computeIfAbsent で DB 前にキャッシュを確認
+        Task task = cacheService.getOrLoad(id)
+                .map(t -> {
+                    log.debug("Task found: {} ({})", t.getTitle(), t.getTaskNumber());
+                    return t;
                 })
                 .orElseThrow(() -> new TaskNotFoundException(id));
+
+        checkOwnership(task);
+
+        return task;
     }
 
     /**
      * 全タスクを取得。
+     * ADMIN は全件、USER は自分のタスクのみ返す。
      */
     public List<Task> getAllTasks() {
-        return taskRepository.findAll();
+        if (SecurityUtils.isAdmin()) {
+            return taskRepository.findAll();
+        }
+        return SecurityUtils.getCurrentUserId()
+                .map(taskRepository::findByAssignedUserId)
+                .orElse(List.of());
     }
 
     /**
      * 検索条件によるフィルタリング。
+     * ADMIN は全件対象、USER は自分のタスクのみ対象。
      * Stream API + Predicate 動的合成で実現。
      */
     public List<Task> searchTasks(TaskSearchCriteria criteria) {
-        List<Task> allTasks = taskRepository.findAll();
+        List<Task> baseTasks = getAllTasks();
 
         Predicate<Task> filter = new TaskFilterBuilder()
                 .withStatus(criteria.getStatus())
@@ -149,7 +203,7 @@ public class TaskService {
                 .withOverdue(criteria.getOverdue())
                 .build();
 
-        return allTasks.stream()
+        return baseTasks.stream()
                 .filter(filter)
                 .sorted(Comparator.comparing(Task::getPriority,
                                 Comparator.comparingInt(TaskPriority::getLevel).reversed())
@@ -218,5 +272,20 @@ public class TaskService {
      */
     public List<Task> getOverdueTasks() {
         return taskRepository.findOverdueTasks(LocalDateTime.now());
+    }
+
+    /**
+     * タスクの所有権チェック。
+     * ADMIN は全タスクにアクセス可。USER は自分のタスクのみ。
+     */
+    private void checkOwnership(Task task) {
+        if (SecurityUtils.isAdmin()) {
+            return;
+        }
+        SecurityUtils.getCurrentUserId().ifPresent(userId -> {
+            if (!userId.equals(task.getAssignedUserId())) {
+                throw new AccessDeniedException("このタスクへのアクセス権がありません");
+            }
+        });
     }
 }

@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.ControllerAdvice;
@@ -61,6 +62,14 @@ public class WebExceptionHandler {
         redirectAttributes.addFlashAttribute("errorMessage", message);
         String referer = request.getHeader("Referer");
         return "redirect:" + (referer != null ? referer : "/tasks");
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public String handleAccessDenied(AccessDeniedException ex,
+                                      RedirectAttributes redirectAttributes) {
+        log.warn("Access denied (web): {}", ex.getMessage());
+        redirectAttributes.addFlashAttribute("errorMessage", "このリソースへのアクセス権がありません。");
+        return "redirect:/tasks";
     }
 
     @ExceptionHandler(Exception.class)

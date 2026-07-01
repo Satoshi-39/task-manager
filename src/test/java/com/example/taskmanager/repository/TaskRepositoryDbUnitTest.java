@@ -30,7 +30,7 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 @DataJpaTest
 @DBRider
-@DBUnit(cacheConnection = false, leakHunter = true)
+@DBUnit(cacheConnection = false, leakHunter = true, schema = "PUBLIC")
 class TaskRepositoryDbUnitTest {
 
     @Autowired
@@ -111,7 +111,7 @@ class TaskRepositoryDbUnitTest {
     @Test
     @DisplayName("削除後のDB状態を検証")
     @DataSet(value = "datasets/tasks.yml", cleanBefore = true)
-    @ExpectedDataSet(value = "datasets/expected-after-delete.yml", ignoreCols = {"description", "due_date", "created_at", "updated_at", "version"})
+    @ExpectedDataSet(value = "datasets/expected-after-delete.yml", ignoreCols = {"description", "due_date", "assigned_user_id", "created_at", "updated_at", "version"})
     void shouldDeleteTaskAndVerifyDbState() {
         taskRepository.deleteById(1L);
         taskRepository.flush();

@@ -1,3 +1,18 @@
+users:
+  - id: 1
+    username: "admin"
+    password: "$2a$10$dXJ3SW6G7P50lGmMQgel3uiIb7m4MsiVRqWVnRnSMao7rvMVj/h9S"
+    display_name: "管理者"
+    role: "ADMIN"
+    enabled: true
+    created_at: "2026-01-01 00:00:00"
+  - id: 2
+    username: "user1"
+    password: "$2a$10$EqKcp1WFKyyfn.dLIuqwBOcOfdPJycFKNZMX/jMEOYJnHMbeBh1WS"
+    display_name: "ユーザー1"
+    role: "USER"
+    enabled: true
+    created_at: "2026-01-01 00:00:00"
 tasks:
   - id: 1
     task_number: "TASK-20260101-0001"
@@ -6,6 +21,7 @@ tasks:
     status: "TODO"
     priority: "HIGH"
     due_date: "2026-12-31 17:00:00"
+    assigned_user_id: 1
     created_at: "2026-01-01 09:00:00"
     updated_at: "2026-01-01 09:00:00"
     version: 0
@@ -16,6 +32,7 @@ tasks:
     status: "IN_PROGRESS"
     priority: "MEDIUM"
     due_date: "2026-07-15 17:00:00"
+    assigned_user_id: 2
     created_at: "2026-01-01 09:00:00"
     updated_at: "2026-01-01 09:00:00"
     version: 0
@@ -26,6 +43,7 @@ tasks:
     status: "DONE"
     priority: "LOW"
     due_date: "2026-06-01 17:00:00"
+    assigned_user_id: 1
     created_at: "2026-01-01 09:00:00"
     updated_at: "2026-06-01 10:00:00"
     version: 1

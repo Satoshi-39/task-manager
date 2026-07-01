@@ -1,10 +1,11 @@
 package com.example.taskmanager.controller;
 
+import com.example.taskmanager.config.SecurityConfig;
 import com.example.taskmanager.domain.entity.Task;
 import com.example.taskmanager.domain.enums.TaskPriority;
 import com.example.taskmanager.domain.enums.TaskStatus;
-import com.example.taskmanager.exception.GlobalExceptionHandler;
 import com.example.taskmanager.exception.TaskNotFoundException;
+import com.example.taskmanager.security.CustomUserDetailsService;
 import com.example.taskmanager.service.TaskBatchService;
 import com.example.taskmanager.service.TaskService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -14,8 +15,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.context.MessageSource;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -23,6 +25,7 @@ import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -31,9 +34,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  *
  * Java Gold トピック:
  * - @WebMvcTest + MockMvc によるコントローラテスト
+ * - @WithMockUser による認証済みユーザーのシミュレーション
  * - JSONレスポンスの検証（jsonPath）
  */
 @WebMvcTest(TaskController.class)
+@Import(SecurityConfig.class)
+@WithMockUser(username = "admin", roles = "ADMIN")
 class TaskControllerTest {
 
     @Autowired
@@ -44,6 +50,9 @@ class TaskControllerTest {
 
     @MockitoBean
     private TaskBatchService taskBatchService;
+
+    @MockitoBean
+    private CustomUserDetailsService customUserDetailsService;
 
     private ObjectMapper objectMapper;
 
@@ -58,7 +67,6 @@ class TaskControllerTest {
     void shouldGetAllTasks() throws Exception {
         Task task = new Task("TASK-001", "Test", "Desc",
                 TaskStatus.TODO, TaskPriority.MEDIUM, null);
-        // @PrePersist を手動で呼ぶためにリフレクションの代わりに直接返す
         when(taskService.getAllTasks()).thenReturn(List.of(task));
 
         mockMvc.perform(get("/api/tasks"))

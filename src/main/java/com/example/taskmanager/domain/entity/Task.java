@@ -46,6 +46,9 @@ public class Task {
     @Column(nullable = false)
     private LocalDateTime updatedAt;
 
+    @Column(name = "assigned_user_id")
+    private Long assignedUserId;
+
     /**
      * 楽観的ロック用バージョン。
      * 同一レコードへの同時更新を検知し OptimisticLockException をスローする。
@@ -65,6 +68,13 @@ public class Task {
         this.status = status;
         this.priority = priority;
         this.dueDate = dueDate;
+    }
+
+    public Task(String taskNumber, String title, String description,
+                TaskStatus status, TaskPriority priority, LocalDateTime dueDate,
+                Long assignedUserId) {
+        this(taskNumber, title, description, status, priority, dueDate);
+        this.assignedUserId = assignedUserId;
     }
 
     @PrePersist
@@ -148,5 +158,13 @@ public class Task {
 
     public Long getVersion() {
         return version;
+    }
+
+    public Long getAssignedUserId() {
+        return assignedUserId;
+    }
+
+    public void setAssignedUserId(Long assignedUserId) {
+        this.assignedUserId = assignedUserId;
     }
 }
