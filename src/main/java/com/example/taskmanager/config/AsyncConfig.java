@@ -12,7 +12,7 @@ import java.util.concurrent.Executor;
  * ThreadPoolTaskExecutor で @Async メソッドの実行スレッドプールを構成する。
  */
 @Configuration
-@EnableAsync
+@EnableAsync(proxyTargetClass = true)
 public class AsyncConfig {
 
     @Bean(name = "taskExecutor")

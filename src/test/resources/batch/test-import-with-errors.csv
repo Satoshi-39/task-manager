@@ -1,0 +1,4 @@
+taskNumber,title,description,status,priority,dueDate,createdAt
+TASK-20260101-0001,正常タスク,正常データ,TODO,HIGH,2026-12-31 17:00:00,2026-01-01 09:00:00
+this is an invalid line without proper delimiters
+TASK-20260101-0003,正常タスク2,正常データ2,IN_PROGRESS,MEDIUM,,2026-01-03 11:00:00

@@ -22,11 +22,19 @@ spring:
   sql:
     init:
       mode: always
+      continue-on-error: true
 
   # 国際化
   messages:
     basename: messages
     encoding: UTF-8
+
+  # Spring Batch設定
+  batch:
+    jdbc:
+      initialize-schema: embedded
+    job:
+      enabled: false
 
   # H2コンソール
   h2:
