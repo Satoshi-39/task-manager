@@ -1,5 +1,7 @@
 package com.example.taskmanager.service;
 
+import com.example.taskmanager.common.TaskEvent;
+import com.example.taskmanager.common.TaskEventListener;
 import com.example.taskmanager.domain.entity.Task;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -11,12 +13,19 @@ import java.util.concurrent.CompletableFuture;
 /**
  * 非同期通知サービス（ログ出力でシミュレート）。
  *
+ * <p>{@link TaskEventListener} を実装し、{@link com.example.taskmanager.common.TaskEventPublisher}
+ * 経由でタスクイベントを受け取る。イベントを受け取ると CompletableFuture チェーンで
+ * 非同期に通知処理を実行する。</p>
+ *
  * Java Gold トピック:
- * - CompletableFuture（supplyAsync, thenApply, exceptionally）
- * - @Async による非同期実行
+ * <ul>
+ *   <li>CompletableFuture（supplyAsync, thenApply, exceptionally）</li>
+ *   <li>{@code @Async} による非同期実行</li>
+ *   <li>TaskEventListener の実装（Observer パターンの具象 Observer）</li>
+ * </ul>
  */
 @Service
-public class TaskNotificationService {
+public class TaskNotificationService implements TaskEventListener {
 
     private static final Logger log = LoggerFactory.getLogger(TaskNotificationService.class);
 
@@ -95,5 +104,22 @@ public class TaskNotificationService {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
+    }
+
+    // --- TaskEventListener 実装 ---
+
+    @Override
+    public void onTaskCreated(TaskEvent event) {
+        notifyTaskCreated(event.getTask());
+    }
+
+    @Override
+    public void onTaskUpdated(TaskEvent event) {
+        log.info("[Notification] Task updated event received: {}", event.getTask().getTaskNumber());
+    }
+
+    @Override
+    public void onTaskDeleted(TaskEvent event) {
+        log.info("[Notification] Task deleted event received: {}", event.getTask().getTaskNumber());
     }
 }
