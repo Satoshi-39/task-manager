@@ -796,3 +796,91 @@ public Step taskExportStep(JobRepository jobRepository,
 - **`AtomicLong`** — スレッドセーフなカウンタ（進捗管理等）
 - **`ConcurrentHashMap`** — スレッドセーフな中間結果の集約
 - **`synchronized` / `ReentrantLock`** — 共有リソースへの排他制御
+
+## 本番環境でのバッチ起動方式
+
+### このプロジェクトと実務の違い
+
+このプロジェクトでは curl + Basic 認証で手動起動しているが、
+これは学習用の動作確認手段であり、本番環境では使わない。
+
+```
+このプロジェクト（学習用）:
+  curl -u admin:admin123 -X POST /api/batch/export
+  → Basic 認証で REST API 経由で起動
+
+本番環境:
+  スケジューラ → java -jar app.jar --spring.batch.job.name=...
+  → 人の手を介さず自動実行（認証自体が不要）
+```
+
+### 実務での起動方式
+
+```
+よくある方式（頻度順）:
+
+  ① スケジューラから直接実行         ★★★ 最も多い
+  ② 内部ネットワーク + 認証なし      ★★
+  ③ API キー / トークン認証          ★
+  ④ Basic 認証                      ほぼない
+```
+
+### ① スケジューラから直接実行（最も一般的）
+
+そもそも REST API 経由でジョブを起動しないパターン。
+アプリ起動時にジョブを実行するか、`@Scheduled` で定期実行する。
+
+```
+OS の cron:
+  0 2 * * * java -jar app.jar --spring.batch.job.name=taskExportJob
+
+クラウドサービス:
+  AWS: CloudWatch Events → ECS Task / Lambda
+  GCP: Cloud Scheduler → Cloud Run Jobs
+  Azure: Azure Functions Timer Trigger
+
+アプリ内:
+  @Scheduled(cron = "0 0 2 * * *")  ← このプロジェクトの TaskBatchScheduler
+
+いずれも人の手を介さないので認証自体が不要。
+```
+
+### ② 内部ネットワーク + 認証なし
+
+管理用 API を社内ネットワーク内に限定し、認証を省略するパターン。
+運用担当者が手動でリカバリ実行する場合などに使う。
+
+```
+┌─────────────────────────────────────┐
+│  VPC / 社内ネットワーク              │
+│                                     │
+│  管理サーバー → POST /internal/batch/export  │
+│                     ↓                        │
+│               バッチアプリ（認証なし）          │
+└─────────────────────────────────────┘
+                    │
+─── インターネットからはアクセス不可 ───
+```
+
+ネットワークレベルで保護するため、アプリ側の認証は不要。
+
+### ③ API キー / トークン認証
+
+REST API でジョブを起動する必要がある場合（外部連携、CI/CD パイプライン等）。
+
+```bash
+# API キー方式
+curl -H "X-API-Key: <secret>" -X POST https://app.example.com/api/batch/export
+
+# Bearer トークン方式
+curl -H "Authorization: Bearer <token>" -X POST https://app.example.com/api/batch/export
+```
+
+### なぜ Basic 認証は使われないか
+
+| 理由 | 説明 |
+|---|---|
+| **パスワードが平文で送信される** | Base64 エンコードは暗号化ではない。HTTPS 必須だが、ログに残るリスクもある |
+| **認証情報の管理** | ユーザー名/パスワードをスクリプトにハードコードしがち |
+| **権限の粒度** | ユーザー単位の認証であり、API 単位の細かい権限制御が難しい |
+| **トークンの失効** | Basic 認証にはトークン期限の概念がなく、パスワード変更でしか無効化できない |

@@ -29,6 +29,7 @@ public class SecurityConfig {
                 // H2 Console は許可
                 .requestMatchers("/h2-console/**").permitAll()
                 // バッチ・エクスポート系は ADMIN のみ
+                .requestMatchers("/api/batch/**").hasRole("ADMIN")
                 .requestMatchers("/api/tasks/batch/**").hasRole("ADMIN")
                 .requestMatchers("/api/tasks/export/**").hasRole("ADMIN")
                 // その他は認証必須
@@ -44,6 +45,8 @@ public class SecurityConfig {
                 .logoutSuccessUrl("/login?logout")
                 .permitAll()
             )
+            // REST API は Basic 認証も許可（curl 等からのアクセス用）
+            .httpBasic(basic -> {})
             .csrf(csrf -> csrf
                 // REST API は CSRF 無効
                 .ignoringRequestMatchers("/api/**")
