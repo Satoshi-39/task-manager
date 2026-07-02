@@ -709,3 +709,90 @@ class TaskExportJobConfigTest {
 - **JobLauncherTestUtils.setJob()**: 複数 Job がある場合、テスト対象の Job を明示的に設定する必要がある
 - **JobParameters のユニーク性**: テストメソッドごとに異なる JobParameters を使う
 - **H2 共有問題**: `@SpringBatchTest` は異なるコンテキストキーを生成するため、同じ H2 に `data.sql` が重複実行される。`continue-on-error: true` で回避
+
+## バッチ処理の並列化
+
+### 基本方針: まずシングルスレッド、遅ければ並列化
+
+Spring Batch はデフォルトでシングルスレッド。このプロジェクトもシングルスレッドで動作する。
+実務でも **大半のバッチ処理はシングルスレッドで十分**。
+
+並列化を検討するのは以下の場合:
+- 処理対象が数万件〜数百万件
+- 処理時間が SLA に収まらない（例: 夜間バッチを朝6時までに終わらせたい）
+
+むやみに並列化すると DB のロック競合やデータ順序の問題が発生するため、
+「まずシングルスレッドで作り、パフォーマンス問題が出たら並列化」が鉄則。
+
+### Spring Batch の並列化手法
+
+```
+簡単 ──────────────────────────────────────── 難しい
+
+  マルチスレッド Step    パラレル Step    パーティショニング    リモートチャンキング
+  (TaskExecutor 設定)   (Flow で並列)    (データ分割)          (サーバー分散)
+       ↑                                                        ↑
+  最もよく使う                                             ほぼ使わない
+```
+
+| 手法 | 仕組み | 実務での使用頻度 |
+|---|---|---|
+| **マルチスレッド Step** | Step に `TaskExecutor` を設定し chunk を複数スレッドで並列処理 | ★★★ 最も多い |
+| **パラレル Step** | `Flow` で独立した複数 Step を同時実行 | ★★ たまに |
+| **パーティショニング** | データを範囲分割し各パーティションを別スレッドで処理 | ★ 大規模案件 |
+| **リモートチャンキング** | Reader はマスター、Processor/Writer をワーカーサーバーに分散 | ほぼ使わない |
+
+### マルチスレッド Step の設定例
+
+最も手軽で実務でもよく使われる並列化手法。
+Step に `TaskExecutor` を設定するだけで chunk が複数スレッドで処理される。
+
+```java
+@Bean
+public Step taskExportStep(JobRepository jobRepository,
+                           PlatformTransactionManager transactionManager,
+                           JpaPagingItemReader<Task> reader,
+                           ItemProcessor<Task, TaskCsvRow> processor,
+                           FlatFileItemWriter<TaskCsvRow> writer,
+                           TaskExecutor taskExecutor) {
+    return new StepBuilder("taskExportStep", jobRepository)
+            .<Task, TaskCsvRow>chunk(10, transactionManager)
+            .reader(reader)
+            .processor(processor)
+            .writer(writer)
+            .taskExecutor(taskExecutor)   // ← これを追加するだけ
+            .throttleLimit(4)             // ← 同時実行スレッド数の上限
+            .build();
+}
+```
+
+```
+シングルスレッド:
+  chunk1 → chunk2 → chunk3 → chunk4 → 完了
+  ─────────────────────────────────→ 時間
+
+マルチスレッド（4スレッド）:
+  Thread-1: chunk1 → chunk5 → ...
+  Thread-2: chunk2 → chunk6 → ...
+  Thread-3: chunk3 → chunk7 → ...
+  Thread-4: chunk4 → chunk8 → ...
+  ──────────────────→ 時間（短縮）
+```
+
+### マルチスレッド化の注意点
+
+| 注意点 | 説明 |
+|---|---|
+| **Reader のスレッドセーフ性** | `JpaPagingItemReader` はスレッドセーフ。`JdbcCursorItemReader` は非スレッドセーフ（`SynchronizedItemStreamReader` でラップが必要） |
+| **Writer の競合** | ファイル出力（`FlatFileItemWriter`）は書き込み順序が保証されない。DB 書き込みは通常問題なし |
+| **処理順序の非保証** | chunk の処理順序が保証されないため、順序依存の処理には不向き |
+| **リスタートの制約** | マルチスレッド Step はリスタート時に「どこまで処理したか」の特定が難しい |
+
+### Java Gold との関連
+
+バッチの並列化では Java Gold で学ぶ並行処理 API がそのまま活きる:
+
+- **`ThreadPoolTaskExecutor`** — `ExecutorService` の Spring ラッパー。スレッドプールの設定
+- **`AtomicLong`** — スレッドセーフなカウンタ（進捗管理等）
+- **`ConcurrentHashMap`** — スレッドセーフな中間結果の集約
+- **`synchronized` / `ReentrantLock`** — 共有リソースへの排他制御
